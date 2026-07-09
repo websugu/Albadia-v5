@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Call UI</title>
+  <link rel="stylesheet" href="CSS/call.css" />
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <style>
+    body{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+    .wrap{width:min(900px,96vw);display:grid;grid-template-columns:1fr;gap:16px;}
+    .videos{display:grid;grid-template-columns:1fr;gap:16px;}
+    @media(min-width:720px){.videos{grid-template-columns:1fr 1fr;}}
+    .video-card{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;position:relative;}
+    video{width:100%;height:100%;display:block;object-fit:cover;aspect-ratio:16/10;background:#000;}
+    .label{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.45);padding:6px 10px;border-radius:999px;font-size:12px;}
+    .hud{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+    .title{font-size:18px;}
+    .actions{display:flex;gap:14px;}
+    .btn{width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+    .btn:hover{transform:scale(1.06);}
+    .end{background:#e74c3c;color:#fff;}
+    .mute{background:#34495e;color:#fff;}
+    .cam{background:#27ae60;color:#fff;}
+    .net{font-size:12px;opacity:.9;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="title" id="call-title">Video Call</div>
+      <div class="net" id="net-status">Checking...</div>
+      <div class="actions">
+        <button class="btn mute" id="mute-btn" title="Mute"><i class="ri-mic-line"></i></button>
+        <button class="btn cam" id="cam-btn" title="Toggle Camera"><i class="ri-camera-fill"></i></button>
+        <button class="btn end" id="end-btn" title="End Call"><i class="ri-phone-line"></i></button>
+      </div>
+    </div>
+
+    <div class="videos">
+      <div class="video-card">
+        <div class="label" id="remote-label">Remote</div>
+        <video id="remote-video" autoplay playsinline></video>
+      </div>
+      <div class="video-card">
+        <div class="label" id="local-label">You</div>
+        <video id="local-video" muted autoplay playsinline></video>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // This file is a UI-only placeholder.
+    // The actual WebRTC signaling is already in calling.html/receiving-call.html.
+    // Once you confirm UI integration, we can merge the interfaces into those files.
+    document.getElementById('end-btn').addEventListener('click', ()=>{
+      window.location.href = 'chats.html';
+    });
+  </script>
+</body>
+</html>
+

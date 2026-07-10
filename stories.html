@@ -303,6 +303,12 @@
     let progressValue = 0;
     const STORY_DURATION = 5000;
     const PROGRESS_INTERVAL = 50;
+
+    // Pause handling (tap-and-hold)
+    let isStoryPaused = false;
+    let pauseAtProgressValue = 0;
+    let holdPauseActive = false;
+
     
     // User's contacts
     let userContacts = [];
@@ -879,7 +885,13 @@
 
     // Progress bar functions
     function startProgressBar() {
-      stopProgressBar();
+      // Starting a new story always resets pause state
+      isStoryPaused = false;
+      holdPauseActive = false;
+      pauseAtProgressValue = 0;
+      document.getElementById("story-viewer").classList.remove("is-paused");
+
+      stopProgressBar(true);
       
       const progressContainer = document.getElementById("story-progress-container");
       progressContainer.innerHTML = "";
@@ -890,7 +902,7 @@
         allStories.forEach((_, index) => {
           const progressBar = document.createElement("div");
           progressBar.className = "story-progress-bar";
-          
+
           if (index < currentStoryIndex) {
             progressBar.classList.add("completed");
             progressBar.innerHTML = '<div class="story-progress-fill" style="width: 100%;"></div>';
@@ -899,33 +911,73 @@
           } else {
             progressBar.innerHTML = '<div class="story-progress-fill" style="width: 0%;"></div>';
           }
-          
+
           progressContainer.appendChild(progressBar);
         });
         
         progressValue = 0;
         const currentProgressBar = progressContainer.children[currentStoryIndex];
-        
+
         if (currentProgressBar) {
           const fill = currentProgressBar.querySelector(".story-progress-fill");
           if (progressInterval) clearInterval(progressInterval);
           progressInterval = setInterval(() => {
+            if (isStoryPaused) return;
             progressValue += (PROGRESS_INTERVAL / STORY_DURATION) * 100;
             if (fill) fill.style.width = Math.min(progressValue, 100) + "%";
-            
+
             if (progressValue >= 100) nextStory();
           }, PROGRESS_INTERVAL);
         }
       }
     }
 
-    function stopProgressBar() {
+    // keepReset=false means we do NOT reset progressValue to 0 (used for pause/resume)
+    function stopProgressBar(keepReset = false) {
       if (progressInterval) {
         clearInterval(progressInterval);
         progressInterval = null;
       }
-      progressValue = 0;
+      if (!keepReset) {
+        progressValue = 0;
+      }
     }
+
+    function setPaused(paused) {
+      isStoryPaused = paused;
+      holdPauseActive = paused;
+      document.getElementById("story-viewer").classList.toggle("is-paused", paused);
+
+      if (paused) {
+        pauseAtProgressValue = progressValue;
+        stopProgressBar(true);
+
+        const progressContainer = document.getElementById("story-progress-container");
+        const currentProgressBar = progressContainer.children[currentStoryIndex];
+        const fill = currentProgressBar?.querySelector(".story-progress-fill");
+        if (fill) fill.style.width = Math.min(pauseAtProgressValue, 100) + "%";
+      } else {
+        // Resume interval from pauseAtProgressValue
+        progressValue = pauseAtProgressValue;
+        pauseAtProgressValue = 0;
+
+        const progressContainer = document.getElementById("story-progress-container");
+        const currentProgressBar = progressContainer.children[currentStoryIndex];
+        const fill = currentProgressBar?.querySelector(".story-progress-fill");
+
+        stopProgressBar(true);
+        if (fill) fill.style.width = Math.min(progressValue, 100) + "%";
+
+        progressInterval = setInterval(() => {
+          if (isStoryPaused) return;
+          progressValue += (PROGRESS_INTERVAL / STORY_DURATION) * 100;
+          if (fill) fill.style.width = Math.min(progressValue, 100) + "%";
+
+          if (progressValue >= 100) nextStory();
+        }, PROGRESS_INTERVAL);
+      }
+    }
+
 
     function nextStory() {
       stopProgressBar();
@@ -955,6 +1007,49 @@
     document.getElementById("story-nav-prev").addEventListener("click", prevStory);
     document.getElementById("story-nav-next").addEventListener("click", nextStory);
 
+    // Tap-and-hold to pause/resume story
+    const viewerEl = document.getElementById("story-viewer");
+
+    function canHoldPause() {
+      // Avoid pausing when interacting with input/button areas
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'BUTTON')) {
+        return false;
+      }
+      return true;
+    }
+
+    viewerEl.addEventListener('pointerdown', (e) => {
+      if (!canHoldPause()) return;
+      if (e.button !== undefined && e.button !== 0) return;
+      holdPauseActive = true;
+      // Prevent accidental clicks from triggering next/prev
+      e.preventDefault();
+      e.stopPropagation();
+      setPaused(true);
+    }, { passive: false });
+
+    viewerEl.addEventListener('pointerup', (e) => {
+      if (!holdPauseActive) return;
+      holdPauseActive = false;
+      setPaused(false);
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
+
+    viewerEl.addEventListener('pointercancel', () => {
+      holdPauseActive = false;
+      setPaused(false);
+    });
+
+    // If user drags finger outside viewer, resume
+    viewerEl.addEventListener('pointerleave', () => {
+      if (!holdPauseActive) return;
+      holdPauseActive = false;
+      setPaused(false);
+    });
+
+
     // Send story reply
     document.getElementById("send-story-reply").addEventListener("click", async () => {
       const replyInput = document.getElementById("story-reply-input");
@@ -977,10 +1072,42 @@
         await updateDoc(doc(db, "stories", currentViewingStory.id), { replies: newReplies });
         
         replyInput.value = "";
-        alert("Reply sent!");
-        
+        // Create/append a chat thread linked to this story reply
+        // Threading approach (client-side): store a deterministic thread id so other pages can open the same conversation.
+        const storyThreadId = `story_${currentViewingStory.id}`;
+
+        // Ensure a conversations doc exists (best-effort; schema depends on your chat implementation)
+        try {
+          await addDoc(collection(db, "conversations"), {
+            threadId: storyThreadId,
+            type: "story_reply",
+            storyId: currentViewingStory.id,
+            participants: [currentUser.uid, currentViewingStory.userId],
+            createdAt: serverTimestamp()
+          });
+        } catch (e) {
+          // ignore if conversations already exist or schema differs
+        }
+
+        // Best-effort: write message in a generic messages collection.
+        // If your app uses a different collection name, adjust here.
+        try {
+          await addDoc(collection(db, "messages"), {
+            threadId: storyThreadId,
+            conversationType: "story_reply",
+            fromId: currentUser.uid,
+            toId: currentViewingStory.userId,
+            text: replyText,
+            timestamp: serverTimestamp(),
+            storyId: currentViewingStory.id
+          });
+        } catch (e) {
+          // ignore if collection structure differs
+        }
+
         // Send notification
         sendStoryNotification('reply', currentViewingStory.id);
+
         
         loadStories();
       } catch (error) {

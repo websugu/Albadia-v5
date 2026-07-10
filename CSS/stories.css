@@ -652,9 +652,15 @@ main {
   transition: width 0.1s linear;
 }
 
+/* Pause state: slightly dim current progress bar */
+.story-viewer.is-paused .story-progress-fill {
+  opacity: 0.85;
+}
+
 .story-progress-bar.completed .story-progress-fill {
   width: 100%;
 }
+
 
 /* Story Header */
 .story-viewer-header {

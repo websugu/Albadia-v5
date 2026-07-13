@@ -375,6 +375,7 @@ main {
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000px;
 }
 
 @keyframes slideUp {
@@ -479,7 +480,8 @@ main {
   resize: none;
   font-size: 16px;
   font-family: inherit;
-  min-height: 80px;
+  height: 30px;
+
 }
 
 .story-input-section textarea:focus {
@@ -500,9 +502,10 @@ main {
 }
 
 .story-preview img {
-  width: 100%;
+  max-width: 50%;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin: auto;
 }
 
 .story-options {
